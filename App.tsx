@@ -299,19 +299,33 @@ const App: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-800">{t.dbTitle}</h2>
-                <p className="text-slate-500 text-sm">{t.dbSub}</p>
+            {/* Data Source card — top */}
+            <div className="bg-indigo-600 rounded-2xl p-6 text-white flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl shadow-indigo-100">
+              <div className="flex gap-4 items-center">
+                <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
+                  <Database className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold mb-1">{t.dataSource}</h3>
+                  <p className="text-indigo-100 text-sm opacity-90">① {lang === 'zh' ? '現行' : 'Current'}: IT Routine Work (Troubleshooting Records)</p>
+                  <p className="text-indigo-100 text-sm opacity-90">② {lang === 'zh' ? '歸檔' : 'Archive'}: IT Routine Work Archive</p>
+                </div>
               </div>
               <button
                 onClick={syncRecords}
                 disabled={isSyncing}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                className="bg-white text-indigo-600 px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-50 transition-colors disabled:opacity-60 flex items-center gap-2 shrink-0"
               >
                 <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
                 {isSyncing ? t.syncing : t.syncNow}
               </button>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-800">{t.dbTitle}</h2>
+                <p className="text-slate-500 text-sm">{t.dbSub}</p>
+              </div>
             </div>
 
             <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
@@ -351,26 +365,6 @@ const App: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-            </div>
-
-            <div className="bg-indigo-600 rounded-2xl p-8 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-indigo-100">
-              <div className="flex gap-4 items-center">
-                <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">
-                  <Database className="w-8 h-8" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">{t.dataSource}</h3>
-                  <p className="text-indigo-100 opacity-80">{t.dataSourceSub}</p>
-                </div>
-              </div>
-              <button
-                onClick={syncRecords}
-                disabled={isSyncing}
-                className="bg-white text-indigo-600 px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-50 transition-colors disabled:opacity-60 flex items-center gap-2"
-              >
-                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                {isSyncing ? t.syncing : t.syncNow}
-              </button>
             </div>
           </div>
         )}

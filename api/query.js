@@ -19,8 +19,9 @@ IMPORTANT: Respond ONLY with a valid JSON object matching this exact schema:
   "relatedRecordIds": ["TR-xxx"]
 }`;
 
-function buildPrompt(issue, historyContext) {
-  return `Historical TR Records:\n${historyContext}\n\n---\nNew Issue Reported: ${issue}`;
+function buildPrompt(issue, historyContext, lang) {
+  const langNote = lang === 'zh' ? '\n\nIMPORTANT: Respond entirely in Traditional Chinese (繁體中文).' : '';
+  return `Historical TR Records:\n${historyContext}\n\n---\nNew Issue Reported: ${issue}${langNote}`;
 }
 
 function isQuotaError(status, body) {
@@ -38,7 +39,7 @@ function parseJsonResponse(text) {
 }
 
 // --- Provider: Google Gemini ---
-async function callGemini(issue, historyContext) {
+async function callGemini(issue, historyContext, lang) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw Object.assign(new Error('GEMINI_API_KEY not set'), { skip: true });
 
@@ -49,7 +50,7 @@ async function callGemini(issue, historyContext) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ role: 'user', parts: [{ text: buildPrompt(issue, historyContext) }] }],
+        contents: [{ role: 'user', parts: [{ text: buildPrompt(issue, historyContext, lang) }] }],
         generationConfig: { responseMimeType: 'application/json' },
       }),
     }
@@ -64,7 +65,7 @@ async function callGemini(issue, historyContext) {
 }
 
 // --- Provider: Groq (llama-3.3-70b) ---
-async function callGroq(issue, historyContext) {
+async function callGroq(issue, historyContext, lang) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw Object.assign(new Error('GROQ_API_KEY not set'), { skip: true });
 
@@ -78,7 +79,7 @@ async function callGroq(issue, historyContext) {
       model: 'llama-3.3-70b-versatile',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildPrompt(issue, historyContext) },
+        { role: 'user', content: buildPrompt(issue, historyContext, lang) },
       ],
       response_format: { type: 'json_object' },
       temperature: 0.3,
@@ -94,7 +95,7 @@ async function callGroq(issue, historyContext) {
 }
 
 // --- Provider: OpenRouter (free models) ---
-async function callOpenRouter(issue, historyContext) {
+async function callOpenRouter(issue, historyContext, lang) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw Object.assign(new Error('OPENROUTER_API_KEY not set'), { skip: true });
 
@@ -109,7 +110,7 @@ async function callOpenRouter(issue, historyContext) {
       model: 'meta-llama/llama-4-scout:free',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildPrompt(issue, historyContext) },
+        { role: 'user', content: buildPrompt(issue, historyContext, lang) },
       ],
       response_format: { type: 'json_object' },
       temperature: 0.3,
@@ -138,7 +139,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { issue, records = [] } = req.body || {};
+  const { issue, records = [], lang = 'en' } = req.body || {};
   if (!issue?.trim()) return res.status(400).json({ error: 'Issue description required' });
 
   // Limit context to most recent 50 records to stay within token limits
@@ -153,7 +154,7 @@ export default async function handler(req, res) {
 
   for (const provider of PROVIDERS) {
     try {
-      const result = await provider.fn(issue, historyContext);
+      const result = await provider.fn(issue, historyContext, lang);
       console.log(`Query handled by ${provider.name}`);
       return res.status(200).json({ ...result, _provider: provider.name });
     } catch (err) {

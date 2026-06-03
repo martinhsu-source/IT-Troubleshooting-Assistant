@@ -2,12 +2,13 @@ import { TroubleshootingRecord, AIResponse } from '../types';
 
 export const getSmartSolution = async (
   currentIssue: string,
-  records: TroubleshootingRecord[]
+  records: TroubleshootingRecord[],
+  lang: string = 'en'
 ): Promise<AIResponse> => {
   const response = await fetch('/api/query', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ issue: currentIssue, records }),
+    body: JSON.stringify({ issue: currentIssue, records, lang }),
   });
 
   if (!response.ok) {

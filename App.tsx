@@ -125,7 +125,7 @@ const App: React.FC = () => {
     setIsAnalyzing(true);
     setError('');
     try {
-      const solution = await getSmartSolution(currentIssue, records);
+      const solution = await getSmartSolution(currentIssue, records, lang);
       setResult(solution);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed. Please try again.');

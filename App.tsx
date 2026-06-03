@@ -155,6 +155,17 @@ const App: React.FC = () => {
             <h1 className="text-xl font-bold tracking-tight text-slate-800">{t.title}</h1>
             <span className="text-xs text-slate-400 ml-1">{t.subtitle}</span>
           </div>
+          {/* Sync status — center */}
+          <div className="hidden md:flex items-center gap-3 text-xs text-slate-400">
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {lastSynced ? t.lastSynced(lastSynced) : (isSyncing ? t.syncing : t.notSynced)}
+            </span>
+            <span className="flex items-center gap-1">
+              <Database className="w-3 h-3" />
+              {t.recordsLoaded(recordCount)}
+            </span>
+          </div>
           <div className="flex items-center gap-3">
             {/* Language toggle */}
             <button
@@ -371,14 +382,7 @@ const App: React.FC = () => {
       </main>
 
       {/* Footer Info */}
-      <footer className="max-w-5xl mx-auto px-6 py-8 border-t border-slate-200 mt-12 flex items-center justify-between text-slate-400 text-sm">
-        <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            {lastSynced ? t.lastSynced(lastSynced) : (isSyncing ? t.syncing : t.notSynced)}
-          </span>
-          <span className="flex items-center gap-1"><Database className="w-3 h-3" /> {t.recordsLoaded(recordCount)}</span>
-        </div>
+      <footer className="max-w-5xl mx-auto px-6 py-8 border-t border-slate-200 mt-12 flex items-center justify-center text-slate-400 text-sm">
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-500" />
           {t.footer}

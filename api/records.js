@@ -201,17 +201,7 @@ export default async function handler(req, res) {
     console.log(`Records — current: ${currentRecords.length}, archive: ${archiveRecords.length}`);
 
     const allRecords = [...archiveRecords, ...currentRecords];
-    return res.status(200).json({
-      records: allRecords,
-      total: allRecords.length,
-      _debug: {
-        currentHeaderRow: curHeaders,
-        currentColMap: curColMap,
-        archiveHeaderRow: archHeaders,
-        archiveColMap: archColMap,
-        counts: { current: currentRecords.length, archive: archiveRecords.length },
-      },
-    });
+    return res.status(200).json({ records: allRecords, total: allRecords.length });
 
   } catch (error) {
     console.error('Records error:', error.message);

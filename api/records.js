@@ -190,7 +190,17 @@ export default async function handler(req, res) {
     console.log(`Records — current: ${currentRecords.length}, archive: ${archiveRecords.length}`);
 
     const allRecords = [...archiveRecords, ...currentRecords];
-    return res.status(200).json({ records: allRecords, total: allRecords.length });
+    return res.status(200).json({
+      records: allRecords,
+      total: allRecords.length,
+      _debug: {
+        currentHeaderRow: curHeaders,
+        currentColMap: curColMap,
+        archiveHeaderRow: archiveValues[findHeaderRowIndex(archiveValues)]?.map(h => String(h || '').trim()) ?? [],
+        archiveColMap: archiveValues.length ? (() => { const i = findHeaderRowIndex(archiveValues); const h = archiveValues[i]?.map(v => String(v||'').trim())??[]; return buildColMap(h, canonical); })() : {},
+        counts: { current: currentRecords.length, archive: archiveRecords.length },
+      },
+    });
 
   } catch (error) {
     console.error('Records error:', error.message);

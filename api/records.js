@@ -191,28 +191,11 @@ export default async function handler(req, res) {
     let archiveRecords = [];
     let archColMap = {};
     let archHeaders = [];
-    let archInvalid = [];
     if (archiveValues.length) {
       const archHeaderIdx = findHeaderRowIndex(archiveValues);
       archHeaders = archiveValues[archHeaderIdx]?.map(h => String(h || '').trim()) ?? [];
       archColMap  = buildColMap(archHeaders, canonical);
       archiveRecords = parseRecords(archiveValues, archHeaderIdx, archColMap);
-
-      // Find invalid rows: have ID but no issue/solution
-      const get = (row, i) => (i >= 0 && row[i] != null ? String(row[i]).trim() : '');
-      const archInvalid = archiveValues.slice(archHeaderIdx + 1)
-        .map((row, rowIdx) => {
-          const id = get(row, archColMap.id);
-          if (!id || PLACEHOLDER_RE.test(id)) return null;
-          const issuePart  = get(row, archColMap.issue);
-          const detailPart = get(row, archColMap.detail);
-          const issue = (issuePart && detailPart) ? `${issuePart}: ${detailPart}` : (issuePart || detailPart);
-          const solution   = get(row, archColMap.solution);
-          if (issue || solution) return null;
-          return { rowIdx: archHeaderIdx + 1 + rowIdx + 1, id, date: get(row, archColMap.date) };
-        })
-        .filter(Boolean);
-      console.log('Archive invalid rows:', JSON.stringify(archInvalid));
 
     }
 
@@ -221,7 +204,7 @@ export default async function handler(req, res) {
     console.log(`Records — current: ${currentRecords.length}, archive: ${archiveRecords.length}`);
 
     const allRecords = [...archiveRecords, ...currentRecords];
-    return res.status(200).json({ records: allRecords, total: allRecords.length, _archiveInvalid: archInvalid ?? [] });
+    return res.status(200).json({ records: allRecords, total: allRecords.length });
 
   } catch (error) {
     console.error('Records error:', error.message);

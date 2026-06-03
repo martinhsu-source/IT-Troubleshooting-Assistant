@@ -1,18 +1,14 @@
 import { createSign } from 'crypto';
 
-// --- CSV / column helpers ---
-function parseCSVLine(line) {
-  const result = [];
-  let cell = '';
-  let inQuotes = false;
-  for (const ch of line) {
-    if (ch === '"') { inQuotes = !inQuotes; }
-    else if (ch === ',' && !inQuotes) { result.push(cell.trim()); cell = ''; }
-    else { cell += ch; }
-  }
-  result.push(cell.trim());
-  return result;
-}
+// Semantic column roles — ordered from most specific to most generic
+const ROLES = [
+  { key: 'id',       patterns: ['TR No', 'TR_NO', 'TR-', 'Ticket No', 'Ticket', 'NO.', 'No.', 'ID'] },
+  { key: 'date',     patterns: ['Report Date', 'DATE', 'Date', '日期', 'Timestamp'] },
+  { key: 'category', patterns: ['CATEGORY', 'Category', 'Dept', 'Department', 'TYPE', 'Type'] },
+  { key: 'issue',    patterns: ['DESCRIPTION', 'Description', 'ISSUE', 'Issue', 'Problem', 'Subject', 'Concern', 'REMARKS', 'Remarks'] },
+  { key: 'solution', patterns: ['RESOLUTION', 'Resolution', 'SOLUTION', 'Solution', 'ACTION TAKEN', 'Action Taken', 'ACTION', 'FIX', 'Fix'] },
+  { key: 'status',   patterns: ['STATUS', 'Status', 'State', 'Result'] },
+];
 
 function findCol(headers, ...patterns) {
   for (const p of patterns) {
@@ -22,8 +18,8 @@ function findCol(headers, ...patterns) {
   return -1;
 }
 
+// Scan first 5 rows and return the index of the most likely header row
 function findHeaderRowIndex(values) {
-  // Scan first 5 rows; pick the one with the most column-name matches
   const probes = ['no', 'date', 'category', 'type', 'description', 'issue',
                   'resolution', 'solution', 'status', 'remarks', 'action'];
   let best = 0, bestScore = 0;
@@ -35,26 +31,47 @@ function findHeaderRowIndex(values) {
   return best;
 }
 
-function mapRowsToRecords(values) {
-  if (!values || values.length < 2) return [];
-  const headerIdx = findHeaderRowIndex(values);
-  const headers = values[headerIdx].map(h => String(h || '').trim());
-  const idIdx   = findCol(headers, 'TR-', 'TR No', 'TR_NO', 'Ticket', 'NO.', 'ID');
-  const dateIdx = findCol(headers, 'DATE', 'Date', '日期');
-  const catIdx  = findCol(headers, 'CATEGORY', 'Category', 'TYPE', 'Type');
-  const issueIdx = findCol(headers, 'DESCRIPTION', 'Description', 'ISSUE', 'Issue', 'Problem', 'REMARKS', 'Subject');
-  const solIdx   = findCol(headers, 'RESOLUTION', 'Resolution', 'SOLUTION', 'Solution', 'ACTION', 'FIX');
-  const statusIdx = findCol(headers, 'STATUS', 'Status', 'State');
+// Build role → column index map from a header row
+// canonicalNames: actual column names resolved from the reference (current) sheet,
+// prepended to each role's search list so they take priority
+function buildColMap(headers, canonicalNames = {}) {
+  const map = {};
+  for (const { key, patterns } of ROLES) {
+    const enhanced = canonicalNames[key]
+      ? [canonicalNames[key], ...patterns]
+      : patterns;
+    map[key] = findCol(headers, ...enhanced);
+  }
+  return map;
+}
 
+// Extract the actual column name that resolved for each role in the reference sheet
+function resolveCanonicalNames(headers, colMap) {
+  const names = {};
+  for (const { key } of ROLES) {
+    const idx = colMap[key];
+    if (idx >= 0) names[key] = headers[idx];
+  }
+  return names;
+}
+
+function parseRecords(values, headerIdx, colMap) {
   return values.slice(headerIdx + 1).map(row => {
     const get = i => (i >= 0 && row[i] != null ? String(row[i]).trim() : '');
-    const id = get(idIdx);
+    const id = get(colMap.id);
     if (!id) return null;
-    const rawStatus = get(statusIdx).toLowerCase();
+    const rawStatus = get(colMap.status).toLowerCase();
     let status = 'Resolved';
     if (rawStatus.includes('pending') || rawStatus.includes('open')) status = 'Pending';
     else if (rawStatus.includes('escalat')) status = 'Escalated';
-    return { id, date: get(dateIdx), category: get(catIdx) || 'General', issue: get(issueIdx), solution: get(solIdx), status };
+    return {
+      id,
+      date:     get(colMap.date),
+      category: get(colMap.category) || 'General',
+      issue:    get(colMap.issue),
+      solution: get(colMap.solution),
+      status,
+    };
   }).filter(r => r && r.id && (r.issue || r.solution));
 }
 
@@ -146,8 +163,29 @@ export default async function handler(req, res) {
 
     const results = await Promise.allSettled(fetches);
 
-    const currentRecords = results[0]?.status === 'fulfilled' ? mapRowsToRecords(results[0].value) : [];
-    const archiveRecords = results[1]?.status === 'fulfilled' ? mapRowsToRecords(results[1].value) : [];
+    const currentValues = results[0]?.status === 'fulfilled' ? results[0].value : [];
+    const archiveValues = results[1]?.status === 'fulfilled' ? results[1].value : [];
+
+    // Step 1: parse current sheet and capture its actual column names as canonical reference
+    const curHeaderIdx = findHeaderRowIndex(currentValues);
+    const curHeaders   = currentValues[curHeaderIdx]?.map(h => String(h || '').trim()) ?? [];
+    const curColMap    = buildColMap(curHeaders);
+    const canonical    = resolveCanonicalNames(curHeaders, curColMap);
+    console.log('Current sheet columns:', canonical);
+
+    const currentRecords = parseRecords(currentValues, curHeaderIdx, curColMap);
+
+    // Step 2: parse archive using canonical names as priority patterns
+    let archiveRecords = [];
+    if (archiveValues.length) {
+      const archHeaderIdx = findHeaderRowIndex(archiveValues);
+      const archHeaders   = archiveValues[archHeaderIdx]?.map(h => String(h || '').trim()) ?? [];
+      const archColMap    = buildColMap(archHeaders, canonical);
+      console.log('Archive sheet columns:', archColMap, 'headers sample:', archHeaders.slice(0, 10));
+      archiveRecords = parseRecords(archiveValues, archHeaderIdx, archColMap);
+    }
+
+    console.log(`Records — current: ${currentRecords.length}, archive: ${archiveRecords.length}`);
 
     const allRecords = [...archiveRecords, ...currentRecords];
     return res.status(200).json({ records: allRecords, total: allRecords.length });

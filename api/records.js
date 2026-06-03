@@ -197,11 +197,6 @@ export default async function handler(req, res) {
       archColMap  = buildColMap(archHeaders, canonical);
       archiveRecords = parseRecords(archiveValues, archHeaderIdx, archColMap);
 
-      // Count rows with non-empty ID (regardless of other fields)
-      const idIdx = archColMap.id;
-      const archDataRows = archiveValues.slice(archHeaderIdx + 1);
-      const rowsWithId = archDataRows.filter(r => r[idIdx] != null && String(r[idIdx]).trim() !== '').length;
-      console.log(`Archive: total rows after header=${archDataRows.length}, rows with ID=${rowsWithId}, valid records=${archiveRecords.length}`);
     }
 
     console.log('Current colMap:', curColMap, '| canonical:', canonical);
@@ -209,19 +204,7 @@ export default async function handler(req, res) {
     console.log(`Records — current: ${currentRecords.length}, archive: ${archiveRecords.length}`);
 
     const allRecords = [...archiveRecords, ...currentRecords];
-    // Temporary: count archive rows with non-empty ID
-    let archiveRowStats = {};
-    if (archiveValues.length) {
-      const archHeaderIdx = findHeaderRowIndex(archiveValues);
-      const idIdx = archColMap.id;
-      const dataRows = archiveValues.slice(archHeaderIdx + 1);
-      archiveRowStats = {
-        totalDataRows: dataRows.length,
-        rowsWithId: dataRows.filter(r => r[idIdx] != null && String(r[idIdx]).trim() !== '').length,
-        validRecords: archiveRecords.length,
-      };
-    }
-    return res.status(200).json({ records: allRecords, total: allRecords.length, _archiveStats: archiveRowStats });
+    return res.status(200).json({ records: allRecords, total: allRecords.length });
 
   } catch (error) {
     console.error('Records error:', error.message);

@@ -1,3 +1,5 @@
+import { createSign } from 'crypto';
+
 // --- CSV / column helpers ---
 function parseCSVLine(line) {
   const result = [];
@@ -42,30 +44,44 @@ function mapRowsToRecords(values) {
   }).filter(r => r && r.id && (r.issue || r.solution));
 }
 
-// --- OAuth: direct HTTP token exchange (no library dependency) ---
-async function getAccessToken() {
-  const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN } = process.env;
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) {
-    throw new Error('Google OAuth env vars not set');
-  }
+// --- Service Account JWT auth ---
+async function getServiceAccountToken() {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON env var not set');
 
-  const body = new URLSearchParams({
-    client_id: GOOGLE_CLIENT_ID,
-    client_secret: GOOGLE_CLIENT_SECRET,
-    refresh_token: GOOGLE_REFRESH_TOKEN,
-    grant_type: 'refresh_token',
-  });
+  const sa = JSON.parse(raw);
+  const privateKey = sa.private_key.replace(/\\n/g, '\n');
+  const clientEmail = sa.client_email;
+
+  const now = Math.floor(Date.now() / 1000);
+  const claim = {
+    iss: clientEmail,
+    scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+  };
+
+  const header  = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify(claim)).toString('base64url');
+  const input   = `${header}.${payload}`;
+
+  const sign = createSign('RSA-SHA256');
+  sign.update(input);
+  const sig = sign.sign(privateKey, 'base64url');
+  const jwt = `${input}.${sig}`;
 
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }).toString(),
   });
 
   const data = await res.json();
-  if (!res.ok) {
-    throw new Error(`OAuth token error: ${data.error} — ${data.error_description}`);
-  }
+  if (!res.ok) throw new Error(`SA token error: ${data.error} — ${data.error_description}`);
   return data.access_token;
 }
 
@@ -109,7 +125,7 @@ export default async function handler(req, res) {
   if (!SHEET_ID) return res.status(200).json({ records: [], message: 'SHEET_ID not configured' });
 
   try {
-    const token = await getAccessToken();
+    const token = await getServiceAccountToken();
 
     const fetches = [fetchSheetValues(token, SHEET_ID, SHEET_GID)];
     if (SHEET_ID_ARCHIVE) fetches.push(fetchSheetValues(token, SHEET_ID_ARCHIVE, SHEET_GID_ARCHIVE));

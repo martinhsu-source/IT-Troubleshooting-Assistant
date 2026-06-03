@@ -210,7 +210,23 @@ export default async function handler(req, res) {
     console.log(`Records — current: ${currentRecords.length}, archive: ${archiveRecords.length}`);
 
     const allRecords = [...archiveRecords, ...currentRecords];
-    return res.status(200).json({ records: allRecords, total: allRecords.length, _dropped: dropped });
+    // Collect every TR-number that appears in either sheet
+    const allSheetIds = new Set();
+    for (const sheetValues of [currentValues, archiveValues]) {
+      if (!sheetValues.length) continue;
+      const hIdx = findHeaderRowIndex(sheetValues);
+      const hdrs = sheetValues[hIdx]?.map(h => String(h || '').trim()) ?? [];
+      const cm   = buildColMap(hdrs);
+      sheetValues.slice(hIdx + 1).forEach(row => {
+        const id = (cm.id >= 0 && row[cm.id] != null) ? String(row[cm.id]).trim() : '';
+        if (id) allSheetIds.add(id);
+      });
+    }
+    // Find TR numbers present in sheet but absent from valid records
+    const validIds = new Set(allRecords.map(r => r.id));
+    const missingFromValid = [...allSheetIds].filter(id => !validIds.has(id)).sort();
+
+    return res.status(200).json({ records: allRecords, total: allRecords.length, _missingFromValid: missingFromValid });
 
   } catch (error) {
     console.error('Records error:', error.message);

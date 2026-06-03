@@ -58,7 +58,7 @@ function resolveCanonicalNames(headers, colMap) {
 
 const PLACEHOLDER_RE = /^(fill\s*up|fill\s*in|select|enter|type\s*here|example|sample|n\/a|tbd)/i;
 
-function parseRecords(values, headerIdx, colMap, dropped = null) {
+function parseRecords(values, headerIdx, colMap) {
   return values.slice(headerIdx + 1).map(row => {
     const get = i => (i >= 0 && row[i] != null ? String(row[i]).trim() : '');
     const id = get(colMap.id);
@@ -77,11 +77,6 @@ function parseRecords(values, headerIdx, colMap, dropped = null) {
     else if (rawStatus.includes('escalat')) status = 'Escalated';
 
 
-
-    if (!issue && !get(colMap.solution)) {
-      if (dropped) dropped.push(id);
-      return null;
-    }
 
     return {
       id,
@@ -190,8 +185,7 @@ export default async function handler(req, res) {
     const curHeaders   = currentValues[curHeaderIdx]?.map(h => String(h || '').trim()) ?? [];
     const curColMap    = buildColMap(curHeaders);
     const canonical    = resolveCanonicalNames(curHeaders, curColMap);
-    const dropped = [];
-    const currentRecords = parseRecords(currentValues, curHeaderIdx, curColMap, dropped);
+    const currentRecords = parseRecords(currentValues, curHeaderIdx, curColMap);
 
     // Parse archive using canonical names as priority
     let archiveRecords = [];
@@ -201,7 +195,7 @@ export default async function handler(req, res) {
       const archHeaderIdx = findHeaderRowIndex(archiveValues);
       archHeaders = archiveValues[archHeaderIdx]?.map(h => String(h || '').trim()) ?? [];
       archColMap  = buildColMap(archHeaders, canonical);
-      archiveRecords = parseRecords(archiveValues, archHeaderIdx, archColMap, dropped);
+      archiveRecords = parseRecords(archiveValues, archHeaderIdx, archColMap);
 
     }
 
@@ -210,34 +204,7 @@ export default async function handler(req, res) {
     console.log(`Records — current: ${currentRecords.length}, archive: ${archiveRecords.length}`);
 
     const allRecords = [...archiveRecords, ...currentRecords];
-    // Collect every TR-number that appears in either sheet
-    const allSheetIds = new Set();
-    for (const sheetValues of [currentValues, archiveValues]) {
-      if (!sheetValues.length) continue;
-      const hIdx = findHeaderRowIndex(sheetValues);
-      const hdrs = sheetValues[hIdx]?.map(h => String(h || '').trim()) ?? [];
-      const cm   = buildColMap(hdrs);
-      sheetValues.slice(hIdx + 1).forEach(row => {
-        const id = (cm.id >= 0 && row[cm.id] != null) ? String(row[cm.id]).trim() : '';
-        if (id) allSheetIds.add(id);
-      });
-    }
-    const validIds = new Set(allRecords.map(r => r.id));
-    // IDs in sheet but filtered out (no content)
-    const inSheetNotValid = [...allSheetIds].filter(id => !validIds.has(id)).sort();
-    // TR numbers completely absent from all sheets (gap in sequence 1-4726)
-    const absentFromSheets = [];
-    for (let n = 1; n <= 4726; n++) {
-      const key = `TR-${n}`;
-      if (!allSheetIds.has(key) && !validIds.has(key)) absentFromSheets.push(key);
-    }
-
-    return res.status(200).json({
-      records: allRecords,
-      total: allRecords.length,
-      _inSheetNotValid: inSheetNotValid,
-      _absentFromSheets: absentFromSheets,
-    });
+    return res.status(200).json({ records: allRecords, total: allRecords.length });
 
   } catch (error) {
     console.error('Records error:', error.message);

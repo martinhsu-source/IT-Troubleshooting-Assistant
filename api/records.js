@@ -222,11 +222,22 @@ export default async function handler(req, res) {
         if (id) allSheetIds.add(id);
       });
     }
-    // Find TR numbers present in sheet but absent from valid records
     const validIds = new Set(allRecords.map(r => r.id));
-    const missingFromValid = [...allSheetIds].filter(id => !validIds.has(id)).sort();
+    // IDs in sheet but filtered out (no content)
+    const inSheetNotValid = [...allSheetIds].filter(id => !validIds.has(id)).sort();
+    // TR numbers completely absent from all sheets (gap in sequence 1-4726)
+    const absentFromSheets = [];
+    for (let n = 1; n <= 4726; n++) {
+      const key = `TR-${n}`;
+      if (!allSheetIds.has(key) && !validIds.has(key)) absentFromSheets.push(key);
+    }
 
-    return res.status(200).json({ records: allRecords, total: allRecords.length, _missingFromValid: missingFromValid });
+    return res.status(200).json({
+      records: allRecords,
+      total: allRecords.length,
+      _inSheetNotValid: inSheetNotValid,
+      _absentFromSheets: absentFromSheets,
+    });
 
   } catch (error) {
     console.error('Records error:', error.message);

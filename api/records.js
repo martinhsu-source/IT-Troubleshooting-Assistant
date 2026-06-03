@@ -55,11 +55,13 @@ function resolveCanonicalNames(headers, colMap) {
   return names;
 }
 
+const PLACEHOLDER_RE = /^(fill\s*up|fill\s*in|select|enter|type\s*here|example|sample|n\/a|tbd)/i;
+
 function parseRecords(values, headerIdx, colMap) {
   return values.slice(headerIdx + 1).map(row => {
     const get = i => (i >= 0 && row[i] != null ? String(row[i]).trim() : '');
     const id = get(colMap.id);
-    if (!id) return null;
+    if (!id || PLACEHOLDER_RE.test(id)) return null;
     const rawStatus = get(colMap.status).toLowerCase();
     let status = 'Resolved';
     if (rawStatus.includes('pending') || rawStatus.includes('open')) status = 'Pending';

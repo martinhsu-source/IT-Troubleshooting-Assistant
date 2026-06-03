@@ -58,7 +58,7 @@ function resolveCanonicalNames(headers, colMap) {
 
 const PLACEHOLDER_RE = /^(fill\s*up|fill\s*in|select|enter|type\s*here|example|sample|n\/a|tbd)/i;
 
-function parseRecords(values, headerIdx, colMap) {
+function parseRecords(values, headerIdx, colMap, incomplete = null) {
   return values.slice(headerIdx + 1).map(row => {
     const get = i => (i >= 0 && row[i] != null ? String(row[i]).trim() : '');
     const id = get(colMap.id);
@@ -75,6 +75,11 @@ function parseRecords(values, headerIdx, colMap) {
     let status = 'Resolved';
     if (rawStatus.includes('pending') || rawStatus.includes('open')) status = 'Pending';
     else if (rawStatus.includes('escalat')) status = 'Escalated';
+
+    if (!issue && !get(colMap.solution)) {
+      if (incomplete) incomplete.push({ id, date: get(colMap.date), category: get(colMap.category) });
+      return null;
+    }
 
     return {
       id,
@@ -183,7 +188,8 @@ export default async function handler(req, res) {
     const curHeaders   = currentValues[curHeaderIdx]?.map(h => String(h || '').trim()) ?? [];
     const curColMap    = buildColMap(curHeaders);
     const canonical    = resolveCanonicalNames(curHeaders, curColMap);
-    const currentRecords = parseRecords(currentValues, curHeaderIdx, curColMap);
+    const curIncomplete = [];
+    const currentRecords = parseRecords(currentValues, curHeaderIdx, curColMap, curIncomplete);
 
     // Parse archive using canonical names as priority
     let archiveRecords = [];
@@ -201,7 +207,7 @@ export default async function handler(req, res) {
     console.log(`Records — current: ${currentRecords.length}, archive: ${archiveRecords.length}`);
 
     const allRecords = [...archiveRecords, ...currentRecords];
-    return res.status(200).json({ records: allRecords, total: allRecords.length });
+    return res.status(200).json({ records: allRecords, total: allRecords.length, _incomplete: curIncomplete });
 
   } catch (error) {
     console.error('Records error:', error.message);

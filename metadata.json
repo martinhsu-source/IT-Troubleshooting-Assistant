@@ -1,0 +1,5 @@
+{
+  "name": "IT Troubleshooting Assistant",
+  "description": "An intelligent IT support tool that analyzes past 'Troubleshooting Records' from your IT Routine Work logs to provide contextual solutions for new technical issues using Gemini AI.",
+  "requestFramePermissions": []
+}

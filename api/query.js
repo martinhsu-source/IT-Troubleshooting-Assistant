@@ -1,74 +1,43 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+import { GoogleGenAI, Type } from '@google/genai';
 
-const SYSTEM_PROMPT = `You are the BB Clark IT Support Assistant, an AI tool helping IT staff at BB International Leisure and Resort (Clark, Philippines) troubleshoot technical issues and look up past Trouble Report (TR) records.
+const SYSTEM_PROMPT = `You are a Senior IT Systems Engineer at BB International Leisure and Resort (Clark, Philippines).
+Your role is to help IT staff diagnose and resolve technical issues across the company's departments (Casino, Hotel, Aqua, OVBD, and admin).
 
-You assist with:
-- Network/WiFi/LAN/VPN connectivity issues
-- Printer and peripheral device problems
-- VoIP/IP phone configuration and troubleshooting
-- Windows PC, server, and domain administration
-- NAS/storage systems (Synology)
-- Software issues (MS Office, browsers, internal systems)
-- Account management and password resets
-- Hardware diagnostics and replacement
+When analyzing an issue:
+1. Cross-reference it with the provided historical TR (Trouble Report) records if relevant
+2. Provide a concise issue analysis explaining the likely root cause
+3. Give clear step-by-step resolution instructions
+4. Assign a confidence score (0-1) based on how closely it matches known patterns
+5. List related TR record IDs that informed your solution (empty array if none)
 
-Departments served: Casino, Hotel, Aqua, OVBD, and admin departments at BB Clark.
+If no historical match exists, apply standard IT engineering knowledge for the type of issue.
+Be practical and concise — IT staff need to act quickly.`;
 
-Guidelines:
-1. Be concise and practical — IT staff needs actionable steps quickly
-2. Provide numbered step-by-step instructions for troubleshooting
-3. If TR records are provided in context and relevant, cite the TR number and its resolution
-4. If an issue requires on-site hardware replacement or admin escalation, say so clearly
-5. You can respond in English or Traditional Chinese based on what the user writes`;
+const RESPONSE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    analysis: {
+      type: Type.STRING,
+      description: 'Concise analysis of the issue and its likely root cause, referencing historical patterns if applicable.',
+    },
+    suggestedSolution: {
+      type: Type.STRING,
+      description: 'Step-by-step resolution instructions. Use numbered steps.',
+    },
+    confidenceScore: {
+      type: Type.NUMBER,
+      description: 'Probability (0.0–1.0) that this solution is correct based on available information.',
+    },
+    relatedRecordIds: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: 'List of TR record IDs from history that directly informed this solution.',
+    },
+  },
+  required: ['analysis', 'suggestedSolution', 'confidenceScore', 'relatedRecordIds'],
+};
 
-function parseCSVLine(line) {
-  const result = [];
-  let cell = '';
-  let inQuotes = false;
-  for (const ch of line) {
-    if (ch === '"') {
-      inQuotes = !inQuotes;
-    } else if (ch === ',' && !inQuotes) {
-      result.push(cell.trim());
-      cell = '';
-    } else {
-      cell += ch;
-    }
-  }
-  result.push(cell.trim());
-  return result;
-}
-
-function parseCSV(text) {
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) return [];
-  const headers = parseCSVLine(lines[0]);
-  return lines.slice(1).map(line => {
-    const values = parseCSVLine(line);
-    const obj = {};
-    headers.forEach((h, i) => {
-      if (h && values[i]) obj[h] = values[i];
-    });
-    return obj;
-  }).filter(r => Object.keys(r).length > 2);
-}
-
-async function fetchTRRecords() {
-  const { SHEET_ID, SHEET_GID } = process.env;
-  if (!SHEET_ID || SHEET_ID === 'PENDING') return null;
-
-  const gidParam = SHEET_GID ? `&gid=${SHEET_GID}` : '';
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv${gidParam}`;
-
-  const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
-  if (!res.ok) return null;
-
-  const records = parseCSV(await res.text());
-  // Return last 80 records to stay within reasonable token limits
-  return records.slice(-80);
-}
-
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -76,40 +45,35 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { message, history = [] } = req.body || {};
-  if (!message) return res.status(400).json({ error: 'Message required' });
+  const { issue, records = [] } = req.body || {};
+  if (!issue?.trim()) return res.status(400).json({ error: 'Issue description required' });
 
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-      systemInstruction: SYSTEM_PROMPT,
+    const historyContext = records.length > 0
+      ? records.map(r =>
+          `ID: ${r.id} | Date: ${r.date} | Category: ${r.category}\nIssue: ${r.issue}\nSolution: ${r.solution}`
+        ).join('\n---\n')
+      : 'No historical records available.';
+
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: `New Issue Reported: ${issue}`,
+      config: {
+        systemInstruction: `${SYSTEM_PROMPT}\n\nHistorical TR Records:\n${historyContext}`,
+        responseMimeType: 'application/json',
+        responseSchema: RESPONSE_SCHEMA,
+      },
     });
 
-    let contextNote = '';
-    try {
-      const records = await fetchTRRecords();
-      if (records?.length > 0) {
-        const recordsText = records
-          .map(r => Object.entries(r).map(([k, v]) => `${k}: ${v}`).join(' | '))
-          .join('\n');
-        contextNote = `\n\n[TR Records (${records.length} recent entries):\n${recordsText}\n]`;
-      }
-    } catch (e) {
-      // Sheet unavailable — continue without TR context
-    }
-
-    const chatHistory = history.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }));
-
-    const chat = model.startChat({ history: chatHistory });
-    const result = await chat.sendMessage(message + contextNote);
-
-    return res.status(200).json({ response: result.response.text() });
+    const parsed = JSON.parse(result.text ?? '{}');
+    return res.status(200).json(parsed);
   } catch (error) {
-    console.error('Handler error:', error);
-    return res.status(500).json({ error: 'Failed to generate response', details: error.message });
+    console.error('Query error:', error);
+    return res.status(500).json({
+      error: 'Failed to generate response',
+      details: error.message,
+    });
   }
-};
+}

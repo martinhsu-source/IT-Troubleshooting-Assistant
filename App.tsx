@@ -5,6 +5,7 @@ import { TroubleshootingRecord, AIResponse } from './types';
 import { getSmartSolution, loadTRRecords } from './services/geminiService';
 import {
   Search,
+  Database,
   Cpu,
   CheckCircle,
   Clock,

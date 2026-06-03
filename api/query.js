@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 
 const SYSTEM_PROMPT = `You are a Senior IT Systems Engineer at BB International Leisure and Resort (Clark, Philippines).
 Your role is to help IT staff diagnose and resolve technical issues across the company's departments (Casino, Hotel, Aqua, OVBD, and admin).
@@ -14,23 +14,23 @@ If no historical match exists, apply standard IT engineering knowledge for the t
 Be practical and concise — IT staff need to act quickly.`;
 
 const RESPONSE_SCHEMA = {
-  type: Type.OBJECT,
+  type: 'object',
   properties: {
     analysis: {
-      type: Type.STRING,
+      type: 'string',
       description: 'Concise analysis of the issue and its likely root cause, referencing historical patterns if applicable.',
     },
     suggestedSolution: {
-      type: Type.STRING,
+      type: 'string',
       description: 'Step-by-step resolution instructions. Use numbered steps.',
     },
     confidenceScore: {
-      type: Type.NUMBER,
+      type: 'number',
       description: 'Probability (0.0–1.0) that this solution is correct based on available information.',
     },
     relatedRecordIds: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
+      type: 'array',
+      items: { type: 'string' },
       description: 'List of TR record IDs from history that directly informed this solution.',
     },
   },
@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
     const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-1.5-flash',
       contents: `New Issue Reported: ${issue}`,
       config: {
         systemInstruction: `${SYSTEM_PROMPT}\n\nHistorical TR Records:\n${historyContext}`,

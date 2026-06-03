@@ -308,7 +308,7 @@ const App: React.FC = () => {
                 <div>
                   <h3 className="text-lg font-bold mb-1">{t.dataSource}</h3>
                   <p className="text-indigo-100 text-sm opacity-90">① {lang === 'zh' ? '現行' : 'Current'}: IT Routine Work (Troubleshooting Records)</p>
-                  <p className="text-indigo-100 text-sm opacity-90">② {lang === 'zh' ? '歸檔' : 'Archive'}: IT Routine Work Archive</p>
+                  <p className="text-indigo-100 text-sm opacity-90">② {lang === 'zh' ? '歸檔' : 'Archive'}: IT Routine Work Archive (Troubleshooting Records)</p>
                 </div>
               </div>
               <button

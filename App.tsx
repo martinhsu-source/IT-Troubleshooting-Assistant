@@ -5,7 +5,6 @@ import { TroubleshootingRecord, AIResponse } from './types';
 import { getSmartSolution, loadTRRecords } from './services/geminiService';
 import {
   Search,
-  Database,
   Cpu,
   CheckCircle,
   Clock,
@@ -49,7 +48,7 @@ const T = {
     colCat: 'Category',
     colIssue: 'Issue Description',
     colStatus: 'Status',
-    recordsLoaded: (n: number) => `${n} records loaded`,
+    recordsLoaded: (n: number) => `Connected: ${n} records`,
     langToggle: '繁體中文',
   },
   zh: {
@@ -81,7 +80,7 @@ const T = {
     colCat: '類別',
     colIssue: '問題描述',
     colStatus: '狀態',
-    recordsLoaded: (n: number) => `已載入 ${n} 筆`,
+    recordsLoaded: (n: number) => `已連線：${n} 筆`,
     langToggle: 'English',
   },
 };
@@ -161,8 +160,16 @@ const App: React.FC = () => {
               <Clock className="w-3 h-3" />
               {lastSynced ? t.lastSynced(lastSynced) : (isSyncing ? t.syncing : t.notSynced)}
             </span>
-            <span className="flex items-center gap-1">
-              <Database className="w-3 h-3" />
+            <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+              lastSynced && !isSyncing
+                ? 'bg-green-50 border-green-200 text-green-600'
+                : isSyncing
+                ? 'bg-yellow-50 border-yellow-200 text-yellow-600'
+                : 'bg-slate-100 border-slate-200 text-slate-400'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                lastSynced && !isSyncing ? 'bg-green-500' : isSyncing ? 'bg-yellow-400 animate-pulse' : 'bg-slate-400'
+              }`} />
               {t.recordsLoaded(recordCount)}
             </span>
           </div>

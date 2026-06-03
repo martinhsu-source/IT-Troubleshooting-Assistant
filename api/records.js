@@ -22,9 +22,23 @@ function findCol(headers, ...patterns) {
   return -1;
 }
 
+function findHeaderRowIndex(values) {
+  // Scan first 5 rows; pick the one with the most column-name matches
+  const probes = ['no', 'date', 'category', 'type', 'description', 'issue',
+                  'resolution', 'solution', 'status', 'remarks', 'action'];
+  let best = 0, bestScore = 0;
+  for (let i = 0; i < Math.min(5, values.length); i++) {
+    const row = values[i].map(h => String(h || '').toLowerCase());
+    const score = probes.filter(p => row.some(h => h.includes(p))).length;
+    if (score > bestScore) { bestScore = score; best = i; }
+  }
+  return best;
+}
+
 function mapRowsToRecords(values) {
   if (!values || values.length < 2) return [];
-  const headers = values[0].map(h => String(h || '').trim());
+  const headerIdx = findHeaderRowIndex(values);
+  const headers = values[headerIdx].map(h => String(h || '').trim());
   const idIdx   = findCol(headers, 'TR-', 'TR No', 'TR_NO', 'Ticket', 'NO.', 'ID');
   const dateIdx = findCol(headers, 'DATE', 'Date', '日期');
   const catIdx  = findCol(headers, 'CATEGORY', 'Category', 'TYPE', 'Type');
@@ -32,7 +46,7 @@ function mapRowsToRecords(values) {
   const solIdx   = findCol(headers, 'RESOLUTION', 'Resolution', 'SOLUTION', 'Solution', 'ACTION', 'FIX');
   const statusIdx = findCol(headers, 'STATUS', 'Status', 'State');
 
-  return values.slice(1).map(row => {
+  return values.slice(headerIdx + 1).map(row => {
     const get = i => (i >= 0 && row[i] != null ? String(row[i]).trim() : '');
     const id = get(idIdx);
     if (!id) return null;
@@ -135,7 +149,7 @@ export default async function handler(req, res) {
     const currentRecords = results[0]?.status === 'fulfilled' ? mapRowsToRecords(results[0].value) : [];
     const archiveRecords = results[1]?.status === 'fulfilled' ? mapRowsToRecords(results[1].value) : [];
 
-    const allRecords = [...archiveRecords, ...currentRecords].slice(-300);
+    const allRecords = [...archiveRecords, ...currentRecords];
     return res.status(200).json({ records: allRecords, total: allRecords.length });
 
   } catch (error) {

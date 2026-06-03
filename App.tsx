@@ -167,14 +167,6 @@ const App: React.FC = () => {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            {/* Language toggle */}
-            <button
-              onClick={() => setLang(l => l === 'en' ? 'zh' : 'en')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-indigo-300 transition-all"
-            >
-              <Languages className="w-4 h-4" />
-              {t.langToggle}
-            </button>
             {/* Tab nav */}
             <nav className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
               <button
@@ -194,6 +186,14 @@ const App: React.FC = () => {
                 {t.tabDB}
               </button>
             </nav>
+            {/* Language toggle */}
+            <button
+              onClick={() => setLang(l => l === 'en' ? 'zh' : 'en')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-indigo-300 transition-all"
+            >
+              <Languages className="w-4 h-4" />
+              {t.langToggle}
+            </button>
           </div>
         </div>
       </header>

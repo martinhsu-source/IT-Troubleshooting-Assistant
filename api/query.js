@@ -141,8 +141,10 @@ export default async function handler(req, res) {
   const { issue, records = [] } = req.body || {};
   if (!issue?.trim()) return res.status(400).json({ error: 'Issue description required' });
 
-  const historyContext = records.length > 0
-    ? records.map(r =>
+  // Limit context to most recent 50 records to stay within token limits
+  const recentRecords = records.slice(-50);
+  const historyContext = recentRecords.length > 0
+    ? recentRecords.map(r =>
         `ID: ${r.id} | Date: ${r.date} | Category: ${r.category}\nIssue: ${r.issue}\nSolution: ${r.solution}`
       ).join('\n---\n')
     : 'No historical records available.';

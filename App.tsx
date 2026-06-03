@@ -22,7 +22,7 @@ type Lang = 'en' | 'zh';
 const T = {
   en: {
     title: 'IT Support Assistant',
-    subtitle: 'BB Clark',
+    subtitle: 'BBI Clark',
     tabSearch: 'Smart Search',
     tabDB: 'Knowledge Base',
     heading: 'How can I help you today?',
@@ -54,7 +54,7 @@ const T = {
   },
   zh: {
     title: 'IT 支援助理',
-    subtitle: 'BB Clark',
+    subtitle: 'BBI Clark',
     tabSearch: '智慧搜尋',
     tabDB: '知識庫',
     heading: '今天有什麼需要協助的？',
